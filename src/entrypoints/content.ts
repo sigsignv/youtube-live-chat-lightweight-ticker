@@ -1,6 +1,12 @@
 export default defineContentScript({
-  matches: ['*://*.google.com/*'],
+  matches: [
+    "https://www.youtube.com/live_chat?*",
+    "https://www.youtube.com/live_chat_replay?*",
+  ],
+  runAt: "document_start",
+  allFrames: true,
+
   main() {
-    console.log('Hello content.');
+    console.log("Hello content.");
   },
 });
