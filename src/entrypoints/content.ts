@@ -1,3 +1,5 @@
+import { defineContentScript, injectScript } from "#imports";
+
 export default defineContentScript({
   matches: [
     "https://www.youtube.com/live_chat?*",
@@ -7,6 +9,6 @@ export default defineContentScript({
   allFrames: true,
 
   main() {
-    console.log("Hello content.");
+    injectScript("/injected.js");
   },
 });
