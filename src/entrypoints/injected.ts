@@ -1,5 +1,10 @@
 import { defineUnlistedScript } from "#imports";
 
+type TickerTask = {
+  kind: "timer";
+  abortController: AbortController;
+};
+
 export default defineUnlistedScript(() => {
   const { requestAnimationFrame } = window;
 
@@ -23,7 +28,7 @@ export default defineUnlistedScript(() => {
       },
     });
 
-    const tickerTasks = new Map();
+    const tickerTasks = new Map<number, TickerTask>();
 
     window.requestAnimationFrame = new Proxy(window.requestAnimationFrame, {
       apply: (target, thisArg, argumentsList) => {
@@ -49,7 +54,7 @@ export default defineUnlistedScript(() => {
           2 * 1000,
           controller.signal,
         );
-        tickerTasks.set(key, controller);
+        tickerTasks.set(key, { kind: "timer", abortController: controller });
         return key;
       },
     });
@@ -57,9 +62,9 @@ export default defineUnlistedScript(() => {
     window.cancelAnimationFrame = new Proxy(window.cancelAnimationFrame, {
       apply: (target, thisArg, argumentsList) => {
         const [key] = argumentsList;
-        const abortController = tickerTasks.get(key);
-        if (abortController) {
-          abortController.abort();
+        const task = tickerTasks.get(key);
+        if (task && task.kind === "timer") {
+          task.abortController.abort();
         }
         Reflect.apply(target, thisArg, argumentsList);
       },
