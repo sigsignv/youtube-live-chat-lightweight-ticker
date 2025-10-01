@@ -1,15 +1,32 @@
 import { defineUnlistedScript } from "#imports";
 
-type TickerTask = {
-  kind: "timer";
-  abortController: AbortController;
+type TickerTask = TickerQueuedTask | TickerScheduledTask;
+
+type TickerQueuedTask = {
+  kind: "queued";
+  callback: FrameRequestCallback;
+};
+
+type TickerScheduledTask = {
+  kind: "scheduled";
+  id: number;
 };
 
 export default defineUnlistedScript(() => {
-  const { requestAnimationFrame } = window;
+  const { requestAnimationFrame, cancelAnimationFrame } = window;
 
   const generatePseudoKey = () => {
     return requestAnimationFrame(() => {});
+  };
+
+  const extractCallbacks = (tasks: Map<number, TickerTask>) => {
+    const m = new Map<number, FrameRequestCallback>();
+    for (const [key, task] of tasks) {
+      if (task.kind === "queued") {
+        m.set(key, task.callback);
+      }
+    }
+    return m;
   };
 
   window.addEventListener("load", () => {
@@ -29,6 +46,7 @@ export default defineUnlistedScript(() => {
     });
 
     const tickerTasks = new Map<number, TickerTask>();
+    let timer: number | null = null;
 
     window.requestAnimationFrame = new Proxy(window.requestAnimationFrame, {
       apply: (target, thisArg, argumentsList) => {
@@ -39,34 +57,37 @@ export default defineUnlistedScript(() => {
         requestIdleCallback(() => tickerUpdates.delete(cb));
 
         const key = generatePseudoKey();
-        const controller = new AbortController();
-        // Ticker run after 2 seconds
-        setTimeout(
-          (signal) => {
-            if (!signal.aborted) {
-              const id = Reflect.apply(target, thisArg, argumentsList);
-              signal.addEventListener("abort", () =>
-                window.cancelAnimationFrame(id),
-              );
+        tickerTasks.set(key, { kind: "queued", callback: cb });
+
+        if (timer === null) {
+          timer = window.setTimeout(() => {
+            timer = null;
+            for (const [key, cb] of extractCallbacks(tickerTasks)) {
+              const id = requestAnimationFrame((time) => {
+                cb(time);
+                requestIdleCallback(() => tickerTasks.delete(key));
+              });
+              tickerTasks.set(key, { kind: "scheduled", id });
             }
-            setTimeout(() => tickerTasks.delete(key), 1000);
-          },
-          2 * 1000,
-          controller.signal,
-        );
-        tickerTasks.set(key, { kind: "timer", abortController: controller });
+          }, 2_000);
+        }
+
         return key;
       },
     });
 
     window.cancelAnimationFrame = new Proxy(window.cancelAnimationFrame, {
       apply: (target, thisArg, argumentsList) => {
-        const [key] = argumentsList;
-        const task = tickerTasks.get(key);
-        if (task && task.kind === "timer") {
-          task.abortController.abort();
-        }
         Reflect.apply(target, thisArg, argumentsList);
+
+        const [key] = argumentsList;
+        if (tickerTasks.has(key)) {
+          const task = tickerTasks.get(key);
+          if (task && task.kind === "scheduled") {
+            cancelAnimationFrame(task.id);
+          }
+          tickerTasks.delete(key);
+        }
       },
     });
   });
