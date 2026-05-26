@@ -1,8 +1,10 @@
 {
-  "name": "youtube-live-chat-lightweight-ticker",
-  "description": "manifest.json description",
   "private": true,
+  "name": "youtube-live-chat-lightweight-ticker",
+  "description": "Reduces CPU usage by throttling YouTube Live's chat ticker",
   "version": "0.1.0",
+  "author": "Sigsign <sig@signote.cc>",
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
