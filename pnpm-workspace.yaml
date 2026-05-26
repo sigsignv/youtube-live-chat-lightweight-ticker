@@ -1,0 +1,4 @@
+allowBuilds:
+  esbuild: false
+  spawn-sync: true
+minimumReleaseAge: 1440
